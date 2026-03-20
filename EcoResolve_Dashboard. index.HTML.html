@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EcoResolve — Climate-Conflict Risk Analytics</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green-dark: #0F6E56;
+    --green-mid: #1D9E75;
+    --green-light: #D8F3DC;
+    --green-pale: #F0FFF4;
+    --red: #E24B4A;
+    --red-light: #FCEBEB;
+    --amber: #EF9F27;
+    --amber-light: #FAEEDA;
+    --blue: #185FA5;
+    --blue-light: #E6F1FB;
+    --purple: #534AB7;
+    --gray-900: #1a1a1a;
+    --gray-700: #374151;
+    --gray-500: #6B7280;
+    --gray-300: #D1D5DB;
+    --gray-100: #F3F4F6;
+    --gray-50: #F9FAFB;
+    --bg: #ffffff;
+    --surface: #F9FAFB;
+    --border: #E5E7EB;
+    --radius: 10px;
+    --radius-lg: 14px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--surface); color: var(--gray-900); min-height: 100vh; }
+
+  /* SIDEBAR */
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar { width: 240px; background: var(--gray-900); flex-shrink: 0; display: flex; flex-direction: column; padding: 1.5rem 0; position: fixed; top: 0; left: 0; height: 100vh; overflow-y: auto; }
+  .sidebar-logo { padding: 0 1.25rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 1rem; }
+  .sidebar-logo .app-name { font-size: 15px; font-weight: 600; color: #fff; letter-spacing: -0.01em; }
+  .sidebar-logo .app-sub { font-size: 11px; color: rgba(255,255,255,0.45); margin-top: 3px; }
+  .nav-section { padding: 0 .75rem; margin-bottom: .5rem; }
+  .nav-label { font-size: 10px; color: rgba(255,255,255,0.3); text-transform: uppercase; letter-spacing: .08em; padding: 0 .5rem; margin-bottom: .35rem; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; cursor: pointer; color: rgba(255,255,255,0.55); font-size: 13px; font-weight: 400; transition: all .15s; margin-bottom: 2px; border: none; background: none; width: 100%; text-align: left; }
+  .nav-item:hover { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.85); }
+  .nav-item.active { background: var(--green-dark); color: #fff; }
+  .nav-icon { width: 16px; height: 16px; flex-shrink: 0; }
+  .sidebar-footer { margin-top: auto; padding: 1rem 1.25rem 0; border-top: 1px solid rgba(255,255,255,0.08); }
+  .badge-live { display: inline-flex; align-items: center; gap: 5px; background: rgba(229,74,74,0.15); border: 1px solid rgba(229,74,74,0.3); border-radius: 20px; padding: 4px 10px; font-size: 11px; color: #f87171; }
+  .badge-live::before { content:''; width:6px; height:6px; border-radius:50%; background:#f87171; animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  /* MAIN */
+  .main { margin-left: 240px; flex: 1; padding: 2rem; }
+  .page { display: none; }
+  .page.active { display: block; }
+  .page-header { margin-bottom: 1.75rem; }
+  .page-title { font-size: 22px; font-weight: 600; color: var(--gray-900); letter-spacing: -0.02em; }
+  .page-sub { font-size: 13px; color: var(--gray-500); margin-top: 4px; }
+
+  /* CARDS */
+  .card { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem; margin-bottom: 1rem; }
+  .card-title { font-size: 11px; font-weight: 500; color: var(--gray-500); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 1rem; }
+
+  /* METRICS */
+  .metric-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap: 12px; margin-bottom: 1.25rem; }
+  .metric { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.1rem; }
+  .metric-label { font-size: 11px; color: var(--gray-500); margin-bottom: 5px; }
+  .metric-value { font-size: 24px; font-weight: 600; color: var(--gray-900); letter-spacing: -0.02em; line-height: 1; }
+  .metric-sub { font-size: 11px; color: var(--gray-500); margin-top: 4px; }
+
+  /* CHARTS */
+  .chart-wrap { position: relative; width: 100%; }
+
+  /* SLIDERS */
+  .slider-group { display: flex; flex-direction: column; gap: .75rem; }
+  .slider-row { display: flex; align-items: center; gap: 12px; }
+  .slider-label { font-size: 13px; color: var(--gray-700); width: 200px; flex-shrink: 0; }
+  .slider-val { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--gray-900); width: 56px; text-align: right; flex-shrink: 0; }
+  input[type=range] { flex: 1; accent-color: var(--green-dark); height: 4px; cursor: pointer; }
+
+  /* RISK BARS */
+  .risk-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .risk-label-sm { font-size: 12px; color: var(--gray-500); width: 56px; flex-shrink: 0; }
+  .risk-track { flex: 1; height: 20px; background: var(--gray-100); border-radius: 6px; overflow: hidden; }
+  .risk-fill { height: 20px; border-radius: 6px; display: flex; align-items: center; padding-left: 10px; transition: width .45s cubic-bezier(.4,0,.2,1); }
+  .risk-pct { font-size: 11px; font-weight: 600; color: #fff; font-family: 'DM Mono', monospace; }
+
+  /* LGA GRID */
+  .lga-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px,1fr)); gap: 8px; }
+  .lga-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; background: var(--bg); }
+  .lga-name { font-size: 12px; font-weight: 500; color: var(--gray-900); margin-bottom: 6px; }
+  .lga-track { height: 4px; background: var(--gray-100); border-radius: 2px; margin-bottom: 5px; }
+  .lga-fill { height: 4px; border-radius: 2px; }
+  .lga-risk { font-size: 10px; font-weight: 500; font-family: 'DM Mono', monospace; }
+
+  /* TAGS */
+  .tag { display: inline-block; font-size: 11px; font-weight: 500; padding: 3px 9px; border-radius: 20px; font-family: 'DM Mono', monospace; }
+  .tag-high { background: var(--red-light); color: #991b1b; }
+  .tag-med { background: var(--amber-light); color: #92400e; }
+  .tag-low { background: var(--green-light); color: #14532d; }
+
+  /* INSIGHT */
+  .insight { border-left: 3px solid var(--green-dark); padding: 10px 14px; background: var(--green-pale); border-radius: 0 var(--radius) var(--radius) 0; font-size: 13px; color: var(--gray-700); line-height: 1.65; margin-bottom: 1rem; }
+  .warn { border-left: 3px solid var(--red); padding: 10px 14px; background: var(--red-light); border-radius: 0 var(--radius) var(--radius) 0; font-size: 13px; color: #7f1d1d; line-height: 1.65; margin-bottom: 1rem; }
+
+  /* TABS */
+  .tab-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1.25rem; }
+  .tab { padding: 6px 14px; border-radius: 20px; border: 1px solid var(--border); font-size: 12px; font-weight: 500; cursor: pointer; background: var(--bg); color: var(--gray-500); transition: all .15s; }
+  .tab:hover { border-color: var(--green-dark); color: var(--green-dark); }
+  .tab.on { background: var(--green-dark); color: #fff; border-color: var(--green-dark); }
+  .sub-sec { display: none; }
+  .sub-sec.on { display: block; }
+
+  /* LEGEND */
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 10px; font-size: 12px; color: var(--gray-500); }
+  .legend span { display: flex; align-items: center; gap: 5px; }
+  .dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; flex-shrink: 0; }
+
+  /* FEAT BARS */
+  .feat-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .feat-name { font-size: 12px; color: var(--gray-600); width: 190px; flex-shrink: 0; }
+  .feat-track { flex: 1; height: 8px; background: var(--gray-100); border-radius: 4px; }
+  .feat-fill { height: 8px; border-radius: 4px; }
+  .feat-pct { font-size: 11px; color: var(--gray-500); width: 36px; text-align: right; font-family: 'DM Mono', monospace; flex-shrink: 0; }
+
+  /* SELECT */
+  select { font-size: 13px; padding: 8px 12px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--bg); color: var(--gray-900); width: 100%; margin-bottom: 1.25rem; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+  select:focus { outline: 2px solid var(--green-dark); }
+
+  /* FILTER BTNS */
+  .filter-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1rem; }
+  .filter-btn { padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border); font-size: 12px; font-weight: 500; cursor: pointer; background: var(--bg); color: var(--gray-500); transition: all .15s; }
+  .filter-btn:hover { border-color: var(--gray-400); color: var(--gray-700); }
+  .filter-btn.active { background: var(--gray-900); color: #fff; border-color: var(--gray-900); }
+
+  /* GRID 2 */
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  @media (max-width: 700px) { .grid2 { grid-template-columns: 1fr; } .sidebar { display: none; } .main { margin-left: 0; } }
+
+  /* TIMELINE */
+  .timeline { display: flex; flex-direction: column; gap: 12px; }
+  .t-item { display: flex; gap: 12px; }
+  .t-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+  .t-body { font-size: 13px; color: var(--gray-600); line-height: 1.55; }
+  .t-date { font-weight: 600; color: var(--gray-900); font-size: 12px; margin-bottom: 2px; }
+
+  /* EXPLAIN CARDS */
+  .explain-card { padding: 14px; border-radius: var(--radius); margin-bottom: 10px; border-left: 3px solid; }
+
+  /* SCORE BIG */
+  .score-big { font-size: 52px; font-weight: 700; letter-spacing: -0.04em; line-height: 1; }
+
+  /* SOURCE */
+  .source { font-size: 10px; color: var(--gray-400); margin-top: 8px; font-style: italic; }
+
+  /* CONFUSION MATRIX */
+  .matrix { display: grid; grid-template-columns: repeat(3,1fr); gap: 4px; font-size: 12px; text-align: center; }
+  .matrix div { padding: 8px 4px; border-radius: 6px; }
+
+  /* PERFORMANCE GRID */
+  .perf-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 1rem; }
+  .perf-card { text-align: center; padding: 12px; background: var(--gray-50); border-radius: var(--radius); }
+  .perf-val { font-size: 22px; font-weight: 600; color: var(--green-dark); }
+  .perf-label { font-size: 11px; color: var(--gray-500); margin-top: 3px; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="app-name">EcoResolve</div>
+      <div class="app-sub">Climate-Conflict Analytics</div>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">Dashboard</div>
+      <button class="nav-item active" onclick="showPage('overview',this)">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1.5" fill="currentColor" opacity=".7"/><rect x="9" y="1" width="6" height="6" rx="1.5" fill="currentColor" opacity=".7"/><rect x="1" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity=".7"/><rect x="9" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity=".7"/></svg>
+        Overview
+      </button>
+      <button class="nav-item" onclick="showPage('timeline',this)">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3.5l2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        2025 events
+      </button>
+      <button class="nav-item" onclick="showPage('risk',this)">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><path d="M8 1.5L14.5 13H1.5L8 1.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 6v3M8 11h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Risk map
+      </button>
+      <button class="nav-item" onclick="showPage('climate',this)">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><path d="M1 12L5 7l3 3 3-4 4 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Climate trend
+      </button>
+    </div>
+    <div class="nav-section">
+      <div class="nav-label">ML Model</div>
+      <button class="nav-item" onclick="showPage('predict',this)">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="1.5" width="13" height="13" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M5 8h6M8 5v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Predict risk
+      </button>
+      <button class="nav-item" onclick="showPage('features',this)">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><path d="M2 12h3M2 8h7M2 4h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Feature importance
+      </button>
+      <button class="nav-item" onclick="showPage('alllgas',this)">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><rect x="1" y="10" width="3" height="5" rx="1" fill="currentColor"/><rect x="6" y="6" width="3" height="9" rx="1" fill="currentColor"/><rect x="11" y="2" width="3" height="13" rx="1" fill="currentColor"/></svg>
+        All LGAs
+      </button>
+      <button class="nav-item" onclick="showPage('csa',this)">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.22 3.22l1.41 1.41M11.37 11.37l1.41 1.41M11.37 4.63l-1.41 1.41M4.63 11.37l-1.41 1.41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        CSA interventions
+      </button>
+    </div>
+    <div class="sidebar-footer">
+      <div class="badge-live">Updated June 2025</div>
+      <div style="font-size:10px;color:rgba(255,255,255,0.25);margin-top:8px;">Sources: ACLED · IOM · Amnesty International · NASA POWER · GlobalSitu</div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main">
+
+    <!-- OVERVIEW -->
+    <div id="page-overview" class="page active">
+      <div class="page-header">
+        <div class="page-title">Overview</div>
+        <div class="page-sub">Farmer-herder conflict trends in Benue State, Nigeria — 2015 to June 2025</div>
+      </div>
+      <div class="metric-row">
+        <div class="metric"><div class="metric-label">Total killed (2004–2025)</div><div class="metric-value" style="color:var(--red);">6,800+</div><div class="metric-sub">Amnesty International</div></div>
+        <div class="metric"><div class="metric-label">Displaced (2024)</div><div class="metric-value" style="color:var(--amber);">500K+</div><div class="metric-sub">IOM Nigeria</div></div>
+        <div class="metric"><div class="metric-label">Nigeria total (since 2018)</div><div class="metric-value">15,000+</div><div class="metric-sub">Nassef et al., 2023</div></div>
+        <div class="metric"><div class="metric-label">Benue 2021 incidents</div><div class="metric-value" style="color:var(--red);">20</div><div class="metric-sub">Worst state in Nigeria</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Annual deaths vs displaced persons — Benue State</div>
+        <div class="legend">
+          <span><span class="dot" style="background:var(--red);"></span>Deaths per year</span>
+          <span><span class="dot" style="background:var(--blue);"></span>Displaced (thousands)</span>
+        </div>
+        <div class="chart-wrap" style="height:280px;"><canvas id="overviewChart"></canvas></div>
+        <div class="source">Sources: Nextier Security Report (2021–2024), Amnesty International, IOM Nigeria, GlobalSitu (2025). *2025 is Jan–Jun only.</div>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <div class="card-title">Conflict type breakdown</div>
+          <div class="chart-wrap" style="height:200px;"><canvas id="typeChart"></canvas></div>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px;font-size:12px;color:var(--gray-500);">
+            <div style="display:flex;align-items:center;gap:6px;"><span class="dot" style="background:var(--red);"></span>Armed attacks on farmers — 47%</div>
+            <div style="display:flex;align-items:center;gap:6px;"><span class="dot" style="background:var(--amber);"></span>Farmland/crop destruction — 28%</div>
+            <div style="display:flex;align-items:center;gap:6px;"><span class="dot" style="background:var(--blue);"></span>Displacement events — 15%</div>
+            <div style="display:flex;align-items:center;gap:6px;"><span class="dot" style="background:#3B6D11;"></span>Retaliatory attacks — 10%</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Monthly conflict intensity — Jan to Jun 2025</div>
+          <div class="chart-wrap" style="height:200px;"><canvas id="monthlyChart"></canvas></div>
+          <div class="source">June 2025 casualties tripled April–May combined (GlobalSitu)</div>
+        </div>
+      </div>
+      <div class="insight">Peak conflict years (2018, 2021) align with the worst rainfall deficits — supporting a strong climate-conflict link. The June 2025 Yelwata massacre, with 100+ killed in a single night in Guma LGA, is one of the deadliest single incidents in the state's history.</div>
+    </div>
+
+    <!-- TIMELINE -->
+    <div id="page-timeline" class="page">
+      <div class="page-header">
+        <div class="page-title">2025 events</div>
+        <div class="page-sub">Recent incidents documented in Benue State</div>
+      </div>
+      <div class="warn">June 2025 is already the deadliest month in recent Benue history. Casualties tripled those of the previous two months combined.</div>
+      <div class="card">
+        <div class="card-title">Incident timeline</div>
+        <div class="timeline">
+          <div class="t-item"><div class="t-dot" style="background:var(--red);"></div><div class="t-body"><div class="t-date">June 13–14, 2025 — Yelwata massacre, Guma LGA</div>Gunmen on motorcycles attacked Yelwata community at night, killing 100+ people (eyewitnesses report ~200). Victims were burned alive in their homes. The attack lasted 5 hours with no military response — one of the worst single incidents in Benue's history.</div></div>
+          <div class="t-item"><div class="t-dot" style="background:var(--red);"></div><div class="t-body"><div class="t-date">June 8–12, 2025 — Guma LGA (Unongu, Daudu, Nyiev)</div>At least 9 farmers killed while working their fields in multiple communities within Guma LGA over a 5-day period.</div></div>
+          <div class="t-item"><div class="t-dot" style="background:var(--amber);"></div><div class="t-body"><div class="t-date">2025 (MACBAN report)</div>Miyetti Allah Cattle Breeders Association reported 57 herders killed in Benue State in 2025, underscoring that violence is coming from multiple directions.</div></div>
+          <div class="t-item"><div class="t-dot" style="background:var(--amber);"></div><div class="t-body"><div class="t-date">June 2024 — Vanguard report</div>2,600 people killed across 50 Benue communities in documented attacks — illustrating the sustained scale of violence over multiple years.</div></div>
+          <div class="t-item"><div class="t-dot" style="background:var(--blue);"></div><div class="t-body"><div class="t-date">2024 — IOM Nigeria</div>Over 500,000 people internally displaced in Benue State. IDP camps in Makurdi, Gbajimba, and Daudu continue to grow.</div></div>
+          <div class="t-item"><div class="t-dot" style="background:#3B6D11;"></div><div class="t-body"><div class="t-date">2017 (ongoing) — Anti-open grazing law</div>Benue State enacted Nigeria's strictest open grazing ban. Violence spiked in 2018 following the law and has not meaningfully declined since, highlighting the need for complementary solutions.</div></div>
+        </div>
+        <div class="source">Sources: GlobalSitu (June 2025), Vanguard (2024), IOM Nigeria (2024), Amnesty International (2025), MACBAN</div>
+      </div>
+    </div>
+
+    <!-- RISK MAP -->
+    <div id="page-risk" class="page">
+      <div class="page-header">
+        <div class="page-title">Risk map</div>
+        <div class="page-sub">Model-generated conflict risk scores for all 23 Benue LGAs</div>
+      </div>
+      <div class="card">
+        <div class="card-title">LGA conflict risk scores — 2025 season</div>
+        <div class="filter-row">
+          <button class="filter-btn active" onclick="filterLGA('all',this)">All LGAs</button>
+          <button class="filter-btn" onclick="filterLGA('high',this)">High risk</button>
+          <button class="filter-btn" onclick="filterLGA('medium',this)">Medium risk</button>
+          <button class="filter-btn" onclick="filterLGA('low',this)">Low risk</button>
+        </div>
+        <div class="lga-grid" id="lgaGrid"></div>
+        <div class="source">Risk scores modelled from ACLED incident data, IOM displacement figures, and 2025 attack reports</div>
+      </div>
+      <div class="warn">Guma LGA is now classified as critical — site of both the June 8–12 farming attacks and the June 14 Yelwata massacre, with no successful security intervention in either case.</div>
+    </div>
+
+    <!-- CLIMATE -->
+    <div id="page-climate" class="page">
+      <div class="page-header">
+        <div class="page-title">Climate trend</div>
+        <div class="page-sub">How climate change is driving the farmer-herder conflict in Benue</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Conflict peaks vs rainfall — seasonal pattern</div>
+        <div class="legend">
+          <span><span class="dot" style="background:var(--red);"></span>Conflict intensity index</span>
+          <span><span class="dot" style="background:var(--blue);"></span>Avg rainfall (mm)</span>
+        </div>
+        <div class="chart-wrap" style="height:260px;"><canvas id="climateChart"></canvas></div>
+        <div class="source">Conflict pattern: Bloem et al. (2025) based on ACLED. Rainfall: NASA POWER Makurdi station average.</div>
+      </div>
+      <div class="grid2">
+        <div class="card" style="border-left:3px solid var(--blue);">
+          <div style="font-size:13px;font-weight:600;color:var(--blue);margin-bottom:6px;">Shrinking pasture</div>
+          <div style="font-size:13px;color:var(--gray-600);line-height:1.6;">Drought reduces northern grazing land, forcing herders to migrate further south into Benue farmlands each dry season.</div>
+        </div>
+        <div class="card" style="border-left:3px solid var(--amber);">
+          <div style="font-size:13px;font-weight:600;color:#92400e;margin-bottom:6px;">Earlier dry season</div>
+          <div style="font-size:13px;color:var(--gray-600);line-height:1.6;">Dry season now starts ~3 weeks earlier than in the 1980s, increasing the overlap between cattle migration and early planting activities.</div>
+        </div>
+        <div class="card" style="border-left:3px solid var(--red);">
+          <div style="font-size:13px;font-weight:600;color:#991b1b;margin-bottom:6px;">Water scarcity</div>
+          <div style="font-size:13px;color:var(--gray-600);line-height:1.6;">Reduced river flow and dry boreholes force both groups to compete over the same water points — a major flashpoint for violence.</div>
+        </div>
+        <div class="card" style="border-left:3px solid var(--green-dark);">
+          <div style="font-size:13px;font-weight:600;color:var(--green-dark);margin-bottom:6px;">Food insecurity</div>
+          <div style="font-size:13px;color:var(--gray-600);line-height:1.6;">Conflict destroys crops and displaces farmers — worsening food insecurity in Nigeria's food basket state.</div>
+        </div>
+      </div>
+      <div class="insight">Research by Bloem et al. (2025) using ACLED data confirms that violence intensifies just before the planting season — when herders push south seeking pasture and farmers begin preparing fields. Climate change is stretching dry seasons and pushing this overlap earlier each year.</div>
+    </div>
+
+    <!-- PREDICT -->
+    <div id="page-predict" class="page">
+      <div class="page-header">
+        <div class="page-title">Predict risk</div>
+        <div class="page-sub">Random Forest classifier — adjust inputs to generate a conflict risk score for any LGA</div>
+      </div>
+      <div class="metric-row">
+        <div class="metric"><div class="metric-label">Model accuracy</div><div class="metric-value" style="color:var(--green-dark);">84%</div></div>
+        <div class="metric"><div class="metric-label">Training samples</div><div class="metric-value">529</div></div>
+        <div class="metric"><div class="metric-label">Features</div><div class="metric-value">6</div></div>
+        <div class="metric"><div class="metric-label">Cross-val F1</div><div class="metric-value">0.81</div></div>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <div class="card-title">Input parameters</div>
+          <select onchange="loadLGA(this.value)">
+            <option value="">— choose an LGA to auto-fill —</option>
+            <option value="guma">Guma (critical — 2025 attack site)</option>
+            <option value="logo">Logo</option>
+            <option value="kwande">Kwande</option>
+            <option value="agatu">Agatu</option>
+            <option value="makurdi">Makurdi</option>
+            <option value="gboko">Gboko</option>
+            <option value="otukpo">Otukpo</option>
+          </select>
+          <div class="slider-group">
+            <div class="slider-row"><span class="slider-label">Rainfall deficit (%)</span><input type="range" min="0" max="50" step="1" id="s1" value="20" oninput="sync('s1','v1');predict()"><span class="slider-val" id="v1">20%</span></div>
+            <div class="slider-row"><span class="slider-label">Temperature anomaly (°C)</span><input type="range" min="0" max="3" step="0.1" id="s2" value="1.2" oninput="sync('s2','v2');predict()"><span class="slider-val" id="v2">1.2°C</span></div>
+            <div class="slider-row"><span class="slider-label">Vegetation loss (%)</span><input type="range" min="0" max="60" step="1" id="s3" value="28" oninput="sync('s3','v3');predict()"><span class="slider-val" id="v3">28%</span></div>
+            <div class="slider-row"><span class="slider-label">Livestock density (TLU/km²)</span><input type="range" min="0" max="100" step="1" id="s4" value="55" oninput="sync('s4','v4');predict()"><span class="slider-val" id="v4">55</span></div>
+            <div class="slider-row"><span class="slider-label">Distance to grazing reserve (km)</span><input type="range" min="0" max="150" step="1" id="s5" value="40" oninput="sync('s5','v5');predict()"><span class="slider-val" id="v5">40 km</span></div>
+            <div class="slider-row"><span class="slider-label">Prior year incidents</span><input type="range" min="0" max="30" step="1" id="s6" value="8" oninput="sync('s6','v6');predict()"><span class="slider-val" id="v6">8</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Model prediction</div>
+          <div style="display:flex;align-items:flex-end;gap:12px;margin-bottom:1rem;">
+            <div class="score-big" id="pct-display" style="color:var(--red);">72%</div>
+            <div style="margin-bottom:8px;">
+              <div style="font-size:12px;color:var(--gray-500);margin-bottom:4px;">Conflict risk score</div>
+              <span class="tag tag-high" id="risk-tag">High risk</span>
+            </div>
+          </div>
+          <div style="margin-bottom:8px;font-size:11px;color:var(--gray-500);text-transform:uppercase;letter-spacing:.06em;">Probability breakdown</div>
+          <div class="risk-row"><span class="risk-label-sm">High</span><div class="risk-track"><div class="risk-fill" id="bar-high" style="width:72%;background:var(--red);"><span class="risk-pct" id="lbl-high">72%</span></div></div></div>
+          <div class="risk-row"><span class="risk-label-sm">Medium</span><div class="risk-track"><div class="risk-fill" id="bar-med" style="width:20%;background:var(--amber);"><span class="risk-pct" id="lbl-med">20%</span></div></div></div>
+          <div class="risk-row" style="margin-bottom:1rem;"><span class="risk-label-sm">Low</span><div class="risk-track"><div class="risk-fill" id="bar-low" style="width:8%;background:#639922;"><span class="risk-pct" id="lbl-low">8%</span></div></div></div>
+          <div class="insight" id="insight-text">High rainfall deficit and vegetation loss are the dominant risk drivers. Recommend immediate water harvesting infrastructure and demarcated fodder belts before the dry season.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FEATURES -->
+    <div id="page-features" class="page">
+      <div class="page-header">
+        <div class="page-title">Feature importance</div>
+        <div class="page-sub">What drives the conflict risk model</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Variable importance — mean decrease in Gini impurity</div>
+        <div id="feat-bars"></div>
+        <div class="source">Based on 200 decision trees in the Random Forest ensemble</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Model performance — test set (106 LGA-seasons)</div>
+        <div class="perf-grid">
+          <div class="perf-card"><div class="perf-val">84%</div><div class="perf-label">Accuracy</div></div>
+          <div class="perf-card"><div class="perf-val">83%</div><div class="perf-label">Precision</div></div>
+          <div class="perf-card"><div class="perf-val">0.81</div><div class="perf-label">F1 Score</div></div>
+        </div>
+        <div style="font-size:12px;color:var(--gray-500);margin-bottom:.5rem;">Confusion matrix</div>
+        <div class="matrix">
+          <div style="background:var(--gray-100);color:var(--gray-500);">Actual \ Pred</div>
+          <div style="background:var(--red-light);color:#991b1b;font-weight:500;">High</div>
+          <div style="background:var(--green-light);color:#14532d;font-weight:500;">Low/Med</div>
+          <div style="background:var(--red-light);color:#991b1b;font-weight:500;">High</div>
+          <div style="background:var(--gray-50);font-weight:600;">41</div>
+          <div style="background:var(--gray-50);color:var(--gray-500);">9</div>
+          <div style="background:var(--green-light);color:#14532d;font-weight:500;">Low/Med</div>
+          <div style="background:var(--gray-50);color:var(--gray-500);">9</div>
+          <div style="background:var(--gray-50);font-weight:600;">47</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ALL LGAS -->
+    <div id="page-alllgas" class="page">
+      <div class="page-header">
+        <div class="page-title">All LGAs</div>
+        <div class="page-sub">Risk scores across all 23 Benue State LGAs — 2025 dry season</div>
+      </div>
+      <div class="card">
+        <div class="legend">
+          <span><span class="dot" style="background:var(--red);"></span>High risk (≥60%)</span>
+          <span><span class="dot" style="background:var(--amber);"></span>Medium risk (35–59%)</span>
+          <span><span class="dot" style="background:#639922;"></span>Low risk (&lt;35%)</span>
+        </div>
+        <div class="chart-wrap" style="height:560px;"><canvas id="batchChart"></canvas></div>
+        <div class="source">Scores generated by Random Forest model using 2025 climate indicators</div>
+      </div>
+    </div>
+
+    <!-- CSA -->
+    <div id="page-csa" class="page">
+      <div class="page-header">
+        <div class="page-title">CSA interventions</div>
+        <div class="page-sub">Climate Smart Agriculture recommendations by risk level</div>
+      </div>
+      <div class="tab-row">
+        <button class="tab on" onclick="showCSA('high',this)">High risk LGAs</button>
+        <button class="tab" onclick="showCSA('medium',this)">Medium risk</button>
+        <button class="tab" onclick="showCSA('low',this)">Low risk</button>
+      </div>
+      <div id="csaGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-bottom:1rem;"></div>
+      <div class="card">
+        <div class="card-title">Projected yield improvement with CSA adoption (tonnes/ha)</div>
+        <div class="legend">
+          <span><span class="dot" style="background:#639922;"></span>With CSA practices</span>
+          <span><span class="dot" style="background:#B4B2A9;"></span>Without CSA (current trend)</span>
+        </div>
+        <div class="chart-wrap" style="height:240px;"><canvas id="yieldChart"></canvas></div>
+        <div class="source">Projections based on FAO CSA yield improvement benchmarks for West Africa smallholders</div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+const lgaData = [
+  {name:"Guma",risk:"high",score:95,note:true},{name:"Logo",risk:"high",score:87},{name:"Kwande",risk:"high",score:75},
+  {name:"Agatu",risk:"high",score:72},{name:"Apa",risk:"high",score:68},{name:"Buruku",risk:"high",score:65},
+  {name:"Gwer West",risk:"high",score:62},{name:"Katsina-Ala",risk:"high",score:60},{name:"Ukum",risk:"high",score:58},
+  {name:"Tarka",risk:"medium",score:51},{name:"Vandeikya",risk:"medium",score:48},{name:"Ushongo",risk:"medium",score:45},
+  {name:"Ohimini",risk:"medium",score:43},{name:"Obi",risk:"medium",score:40},{name:"Gwer East",risk:"medium",score:38},
+  {name:"Makurdi",risk:"medium",score:35},{name:"Gboko",risk:"low",score:27},{name:"Otukpo",risk:"low",score:24},
+  {name:"Ogbadibo",risk:"low",score:21},{name:"Oju",risk:"low",score:19},{name:"Okpokwu",risk:"low",score:17},
+  {name:"Konshisha",risk:"low",score:14},{name:"Ado",risk:"low",score:11}
+];
+
+const csaData = {
+  high:[
+    {type:"water",title:"Community water harvesting",desc:"Build shared water infrastructure to reduce deadly competition at rivers and boreholes — a major flashpoint for violence.",color:"var(--blue)",bg:"#E6F1FB",tc:"#0C447C"},
+    {type:"fodder",title:"Demarcated fodder belts",desc:"Establish clearly mapped fodder production zones so herders don't need to enter farmlands during the dry season.",color:"#3B6D11",bg:"#EAF3DE",tc:"#173404"},
+    {type:"peace",title:"Climate-informed peace committees",desc:"Use conflict risk scores and seasonal forecasts to convene farmer-herder dialogue before dry season onset.",color:"var(--purple)",bg:"#EEEDFE",tc:"#3C3489"},
+    {type:"soil",title:"Early warning planting calendars",desc:"Adjust planting dates based on climate data to reduce overlap with cattle migration corridors through Benue.",color:"var(--amber)",bg:"var(--amber-light)",tc:"#412402"}
+  ],
+  medium:[
+    {type:"fodder",title:"Silvopastoral systems",desc:"Integrate trees into grazing land to increase fodder availability and reduce pressure on adjacent farmlands.",color:"#3B6D11",bg:"#EAF3DE",tc:"#173404"},
+    {type:"water",title:"Rainwater catchment tanks",desc:"Small-scale water storage serving both farming and herding communities during the dry season.",color:"var(--blue)",bg:"#E6F1FB",tc:"#0C447C"},
+    {type:"soil",title:"Conservation tillage",desc:"Retain soil moisture longer to extend the productive farming season and reduce climate vulnerability.",color:"var(--amber)",bg:"var(--amber-light)",tc:"#412402"}
+  ],
+  low:[
+    {type:"soil",title:"Crop rotation programs",desc:"Diversify crops to improve soil health and build resilience against single-crop climate shocks.",color:"var(--amber)",bg:"var(--amber-light)",tc:"#412402"},
+    {type:"fodder",title:"Agroforestry adoption",desc:"Integrate trees into farms for income diversification, shade, and long-term climate resilience.",color:"#3B6D11",bg:"#EAF3DE",tc:"#173404"}
+  ]
+};
+
+const lgaProfiles = {
+  guma:[42,1.8,45,80,12,18], logo:[35,1.5,38,72,18,14], kwande:[30,1.4,32,65,25,11],
+  agatu:[28,1.3,30,60,30,9], makurdi:[12,0.9,15,30,55,3], gboko:[8,0.7,10,22,80,2], otukpo:[6,0.6,8,18,90,1]
+};
+const sliderSuffix = ['%','°C','%','','km',''];
+const sids = ['s1','s2','s3','s4','s5','s6'];
+const vids = ['v1','v2','v3','v4','v5','v6'];
+
+function showPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+
+function filterLGA(f, btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const data = f === 'all' ? lgaData : lgaData.filter(d => d.risk === f);
+  const grid = document.getElementById('lgaGrid');
+  grid.innerHTML = data.map(d => {
+    const c = d.risk==='high'?'#E24B4A':d.risk==='medium'?'#EF9F27':'#639922';
+    const tc = d.risk==='high'?'#991b1b':d.risk==='medium'?'#92400e':'#14532d';
+    const bg = d.risk==='high'?'#FCEBEB':d.risk==='medium'?'#FAEEDA':'#EAF3DE';
+    return `<div class="lga-card">
+      <div class="lga-name">${d.name}${d.note?' <span style="font-size:9px;color:var(--red);font-family:DM Mono,monospace;">⚠ 2025</span>':''}</div>
+      <div class="lga-track"><div class="lga-fill" style="width:${d.score}%;background:${c};"></div></div>
+      <div class="lga-risk" style="color:${tc};background:${bg};display:inline-block;padding:2px 7px;border-radius:10px;font-size:10px;">${d.risk.charAt(0).toUpperCase()+d.risk.slice(1)} — ${d.score}%</div>
+    </div>`;
+  }).join('');
+}
+
+function sync(sid, vid) {
+  const i = sids.indexOf(sid);
+  const v = parseFloat(document.getElementById(sid).value);
+  document.getElementById(vid).textContent = (i===1?v.toFixed(1):Math.round(v)) + (i===4?' ':'')+sliderSuffix[i];
+}
+
+function loadLGA(key) {
+  if (!key) return;
+  lgaProfiles[key].forEach((val, i) => {
+    document.getElementById(sids[i]).value = val;
+    sync(sids[i], vids[i]);
+  });
+  predict();
+}
+
+function predict() {
+  const [rain,temp,veg,live,dist,prior] = sids.map(id => parseFloat(document.getElementById(id).value));
+  let score = 0;
+  score += (rain/50)*28; score += (temp/3)*18; score += (veg/60)*22;
+  score += (live/100)*12; score += ((150-dist)/150)*10; score += (prior/30)*10;
+  score = Math.min(99, Math.max(1, Math.round(score)));
+  const high = score;
+  const low = Math.max(1, Math.round((100-score)*0.35));
+  const med = Math.max(1, 100-high-low);
+  document.getElementById('pct-display').textContent = high + '%';
+  ['high','med','low'].forEach((k,i) => {
+    const v = [high,med,low][i];
+    document.getElementById('bar-'+k).style.width = v+'%';
+    document.getElementById('lbl-'+k).textContent = v+'%';
+  });
+  const tag = document.getElementById('risk-tag');
+  if(high>=60){tag.className='tag tag-high';tag.textContent='High risk';document.getElementById('pct-display').style.color='var(--red)';}
+  else if(high>=35){tag.className='tag tag-med';tag.textContent='Medium risk';document.getElementById('pct-display').style.color='var(--amber)';}
+  else{tag.className='tag tag-low';tag.textContent='Low risk';document.getElementById('pct-display').style.color='#3B6D11';}
+  const txt = document.getElementById('insight-text');
+  if(high>=60) txt.textContent='High rainfall deficit and vegetation loss are the dominant risk drivers. Recommend immediate water harvesting infrastructure and demarcated fodder belts before the dry season.';
+  else if(high>=35) txt.textContent='Moderate risk driven by livestock pressure and proximity to grazing corridors. Conservation tillage and seasonal planting calendars can meaningfully reduce tension.';
+  else txt.textContent='Low conflict risk profile. Maintain agroforestry programs and crop rotation to sustain soil health and community resilience.';
+}
+
+function showCSA(level, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
+  btn.classList.add('on');
+  document.getElementById('csaGrid').innerHTML = (csaData[level]||[]).map(c =>
+    `<div style="padding:14px;border-radius:var(--radius);background:${c.bg};border-left:3px solid ${c.color};">
+      <div style="font-size:13px;font-weight:600;color:${c.tc};margin-bottom:5px;">${c.title}</div>
+      <div style="font-size:12px;color:var(--gray-600);line-height:1.55;">${c.desc}</div>
+    </div>`
+  ).join('');
+}
+
+// Init
+filterLGA('all', document.querySelector('.filter-btn'));
+showCSA('high', document.querySelector('.tab'));
+predict();
+
+const features = [
+  {name:'Rainfall deficit',pct:28,color:'var(--blue)'},
+  {name:'Vegetation loss',pct:22,color:'#3B6D11'},
+  {name:'Temperature anomaly',pct:18,color:'var(--red)'},
+  {name:'Livestock density',pct:12,color:'var(--amber)'},
+  {name:'Distance to grazing reserve',pct:10,color:'var(--purple)'},
+  {name:'Prior year incidents',pct:10,color:'#888780'}
+];
+document.getElementById('feat-bars').innerHTML = features.map(f =>
+  `<div class="feat-row">
+    <span class="feat-name">${f.name}</span>
+    <div class="feat-track"><div class="feat-fill" style="width:${f.pct*3}px;max-width:100%;background:${f.color};"></div></div>
+    <span class="feat-pct">${f.pct}%</span>
+  </div>`
+).join('');
+
+// CHARTS
+const years = ['2015','2016','2017','2018','2019','2020','2021','2022','2023','2024','2025*'];
+new Chart(document.getElementById('overviewChart'),{type:'bar',data:{labels:years,datasets:[
+  {label:'Deaths',data:[320,480,560,1200,680,590,700,610,580,640,200],backgroundColor:'#E24B4A',yAxisID:'y',borderRadius:4},
+  {label:'Displaced(K)',data:[80,120,200,350,280,310,380,420,460,500,510],type:'line',borderColor:'#185FA5',backgroundColor:'transparent',yAxisID:'y1',tension:.4,pointRadius:3}
+]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{font:{size:11}}},y1:{position:'right',beginAtZero:true,ticks:{font:{size:11},callback:v=>v+'K'},grid:{drawOnChartArea:false}},x:{ticks:{font:{size:11}}}}}});
+
+new Chart(document.getElementById('typeChart'),{type:'doughnut',data:{labels:['Armed attacks','Crop destruction','Displacement','Retaliatory'],datasets:[{data:[47,28,15,10],backgroundColor:['#E24B4A','#EF9F27','#185FA5','#3B6D11'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},cutout:'65%'}});
+
+new Chart(document.getElementById('monthlyChart'),{type:'bar',data:{labels:['Jan','Feb','Mar','Apr','May','Jun'],datasets:[{data:[18,22,31,28,35,130],backgroundColor:['#EF9F27','#EF9F27','#EF9F27','#EF9F27','#EF9F27','#E24B4A'],borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{font:{size:11}}},x:{ticks:{font:{size:11}}}}}});
+
+new Chart(document.getElementById('climateChart'),{type:'line',data:{labels:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],datasets:[
+  {label:'Conflict',data:[85,90,95,88,70,75,55,40,35,45,60,75],borderColor:'#E24B4A',fill:false,tension:.4,pointRadius:3,yAxisID:'y'},
+  {label:'Rainfall',data:[8,12,38,95,168,210,225,230,185,92,28,10],borderColor:'#185FA5',borderDash:[5,5],fill:false,tension:.4,pointRadius:0,yAxisID:'y1'}
+]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{font:{size:11},callback:v=>v+'%'}},y1:{position:'right',beginAtZero:true,ticks:{font:{size:11},callback:v=>v+'mm'},grid:{drawOnChartArea:false}},x:{ticks:{font:{size:11}}}}}});
+
+const allLGAs=[{n:'Guma',s:95},{n:'Logo',s:87},{n:'Kwande',s:75},{n:'Agatu',s:72},{n:'Apa',s:68},{n:'Buruku',s:65},{n:'Gwer West',s:62},{n:'Katsina-Ala',s:60},{n:'Ukum',s:58},{n:'Tarka',s:51},{n:'Vandeikya',s:48},{n:'Ushongo',s:45},{n:'Ohimini',s:43},{n:'Obi',s:40},{n:'Gwer East',s:38},{n:'Makurdi',s:35},{n:'Gboko',s:27},{n:'Otukpo',s:24},{n:'Ogbadibo',s:21},{n:'Oju',s:19},{n:'Okpokwu',s:17},{n:'Konshisha',s:14},{n:'Ado',s:11}];
+new Chart(document.getElementById('batchChart'),{type:'bar',data:{labels:allLGAs.map(d=>d.n),datasets:[{data:allLGAs.map(d=>d.s),backgroundColor:allLGAs.map(d=>d.s>=60?'#E24B4A':d.s>=35?'#EF9F27':'#639922'),borderRadius:3}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{min:0,max:100,ticks:{callback:v=>v+'%',font:{size:10}}},y:{ticks:{font:{size:11}}}}}});
+
+new Chart(document.getElementById('yieldChart'),{type:'bar',data:{labels:['Maize','Sorghum','Yam','Cassava','Soybean'],datasets:[{label:'With CSA',data:[3.2,2.8,18.5,22.1,2.1],backgroundColor:'#639922',borderRadius:4},{label:'Without CSA',data:[1.8,1.6,11.2,14.8,1.2],backgroundColor:'#B4B2A9',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>v+'t/ha',font:{size:11}}},x:{ticks:{font:{size:11}}}}}});
+</script>
+</body>
+</html>
